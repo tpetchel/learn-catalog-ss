@@ -34,6 +34,19 @@ public class ModuleMetadata : MetadataBase
 
     public string Author { get => Lookup<Dictionary<object, object>>("metadata")["ms.author"].ToString(); }
 
+    public string Date { get
+        {
+            try
+            {
+                return Lookup<Dictionary<object, object>>("metadata")["ms.date"].ToString();
+            }
+            catch (KeyNotFoundException)
+            {
+                return string.Empty;
+            }
+        }
+    }
+
     public List<string> Products { get => Lookup<List<object>>("products").Select(product => product.ToString()).ToList(); }
 
     public List<string> Units { get => Lookup<List<object>>("units").Select(unit => unit.ToString()).ToList(); }
