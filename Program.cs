@@ -32,7 +32,7 @@ using (var workbook = new XLWorkbook())
     var freshness = workbook.Worksheets.Add("Freshness");
     WriteFreshness(freshness, allMetadata);
 
-    workbook.SaveAs("LearnCatalog2.xlsx");
+    workbook.SaveAs("LearnCatalog3.xlsx");
 }
 
 static IEnumerable<ModuleMetadata> CollectModuleMetadata(string repo)
@@ -57,8 +57,9 @@ static void WriteOverview(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
     worksheet.Cell(1, 1).Value = "Title";
     worksheet.Cell(1, 2).Value = "Repo";
     worksheet.Cell(1, 3).Value = "Author";
-    worksheet.Cell(1, 4).Value = "Date";
-    worksheet.Cell(1, 5).Value = "Products";
+    worksheet.Cell(1, 4).Value = "ms.author";
+    worksheet.Cell(1, 5).Value = "Date";
+    worksheet.Cell(1, 6).Value = "Products";
 
     var firstRow = worksheet.Row(1);
     firstRow.Style.Fill.BackgroundColor = XLColor.Black;
@@ -76,10 +77,11 @@ static void WriteOverview(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
             worksheet.Cell(index, 1).Value = metadata.Title;
             worksheet.Cell(index, 2).Value = repo;
             worksheet.Cell(index, 3).Value = metadata.Author;
-            worksheet.Cell(index, 4).Value = metadata.Date;
+            worksheet.Cell(index, 4).Value = metadata.MsAuthor;
+            worksheet.Cell(index, 5).Value = metadata.Date;
             var products = new List<string>(metadata.Products);
             products.Sort();
-            worksheet.Cell(index, 5).Value = string.Join(',', products);
+            worksheet.Cell(index, 6).Value = string.Join(',', products);
             index++;
         }
     }
@@ -96,7 +98,8 @@ static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
     worksheet.Cell(1, 2).Value = "Title";
     worksheet.Cell(1, 3).Value = "Repo";
     worksheet.Cell(1, 4).Value = "Author";
-    worksheet.Cell(1, 5).Value = "Date";
+    worksheet.Cell(1, 5).Value = "ms.author";
+    worksheet.Cell(1, 6).Value = "Date";
 
     var firstRow = worksheet.Row(1);
     firstRow.Style.Fill.BackgroundColor = XLColor.Black;
@@ -105,7 +108,7 @@ static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
     firstRow.Style.Font.FontColor = XLColor.Aqua;
     worksheet.SheetView.FreezeRows(1);
 
-    Dictionary<string, List<(string Title, string Repo, string Author, string Date)>> items = new();
+    Dictionary<string, List<(string Title, string Repo, string Author, string MsAuthor, string Date)>> items = new();
     foreach (var (repo, metadataList) in allMetadata)
     {
         foreach (var metadata in metadataList)
@@ -114,9 +117,9 @@ static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
             {
                 if (!items.ContainsKey(product))
                 {
-                    items.Add(product, new List<(string Title, string Repo, string Author, string Date)>());
+                    items.Add(product, new List<(string Title, string Repo, string Author, string MsAuthor, string Date)>());
                 }
-                items[product].Add((Title: metadata.Title, Repo: repo, Author: metadata.Author, Date: metadata.Date));
+                items[product].Add((Title: metadata.Title, Repo: repo, Author: metadata.Author, MsAuthor: metadata.MsAuthor, Date: metadata.Date));
             }
         }
     }
@@ -132,7 +135,8 @@ static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
             worksheet.Cell(index, 2).Value = item.Title;
             worksheet.Cell(index, 3).Value = item.Repo;
             worksheet.Cell(index, 4).Value = item.Author;
-            worksheet.Cell(index, 5).Value = item.Date;
+            worksheet.Cell(index, 5).Value = item.MsAuthor;
+            worksheet.Cell(index, 6).Value = item.Date;
             index++;
         }
     }

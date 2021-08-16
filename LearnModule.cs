@@ -32,7 +32,9 @@ public class ModuleMetadata : MetadataBase
 
     public string Title { get => Lookup<string>("title"); }
 
-    public string Author { get => Lookup<Dictionary<object, object>>("metadata")["ms.author"].ToString(); }
+    public string Author { get => Lookup<Dictionary<object, object>>("metadata")["author"].ToString(); }
+
+    public string MsAuthor { get => Lookup<Dictionary<object, object>>("metadata")["ms.author"].ToString(); }
 
     public string Date { get
         {
