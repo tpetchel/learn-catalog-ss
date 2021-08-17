@@ -4,13 +4,26 @@ using System.IO;
 using System.Linq;
 using ClosedXML.Excel;
 
+const string repoBasePath = "/Users/thpetche/Dev/MicrosoftDocs/";
+
 // hardcoded; this project is a one-off solution
 var repos = new string[] {
-    "/Users/thpetche/Dev/MicrosoftDocs/learn-pr",
-    "/Users/thpetche/Dev/MicrosoftDocs/learn-m365-pr",
-    "/Users/thpetche/Dev/MicrosoftDocs/learn-dynamics-pr",
-    "/Users/thpetche/Dev/MicrosoftDocs/learn-bizapps-pr",
+    $"{repoBasePath}learn-pr",
+    $"{repoBasePath}learn-m365-pr",
+    $"{repoBasePath}learn-dynamics-pr",
+    $"{repoBasePath}learn-bizapps-pr",
 };
+
+// Load CSA to Learn Product mapping.
+ProductCSAOwnerTable.Load("CSA to Learn Product mapping.xlsx");
+//ProductsTable.Dump();
+
+string contentOwnersMarkdownFile = $"{repoBasePath}docs-help-pr/help-content/contribute/faq-service-content-owners.md";
+CSAApproversTable.Load(contentOwnersMarkdownFile);
+//CSAApproversTable.Dump();
+
+ProductTaxonomyTable.Load("product-taxonomy.json");
+//ProductTaxonomyTable.Dump();
 
 using (var workbook = new XLWorkbook())
 {
@@ -32,7 +45,10 @@ using (var workbook = new XLWorkbook())
     var freshness = workbook.Worksheets.Add("Freshness");
     WriteFreshness(freshness, allMetadata);
 
-    workbook.SaveAs("LearnCatalog3.xlsx");
+    var recommendations = workbook.Worksheets.Add("Recommendations");
+    WriteRecommendations(recommendations, Query.RecommendProducts(allMetadata));
+
+    workbook.SaveAs("LearnCatalog.xlsx");
 }
 
 static IEnumerable<ModuleMetadata> CollectModuleMetadata(string repo)
@@ -47,6 +63,7 @@ static IEnumerable<ModuleMetadata> CollectModuleMetadata(string repo)
             continue;
         }
         var metadata = ModuleMetadata.Load(file);
+        PathTable.FilePaths[metadata.Uid] = file.Remove(0, repoBasePath.Length);
         metadataList.Add(metadata);
     }
     return metadataList;
@@ -58,8 +75,10 @@ static void WriteOverview(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
     worksheet.Cell(1, 2).Value = "Repo";
     worksheet.Cell(1, 3).Value = "Author";
     worksheet.Cell(1, 4).Value = "ms.author";
-    worksheet.Cell(1, 5).Value = "Date";
+    worksheet.Cell(1, 5).Value = "ms.date";
     worksheet.Cell(1, 6).Value = "Products";
+    worksheet.Cell(1, 7).Value = "CSAs";
+    worksheet.Cell(1, 8).Value = "Owner";
 
     var firstRow = worksheet.Row(1);
     firstRow.Style.Fill.BackgroundColor = XLColor.Black;
@@ -82,6 +101,10 @@ static void WriteOverview(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
             var products = new List<string>(metadata.Products);
             products.Sort();
             worksheet.Cell(index, 6).Value = string.Join(',', products);
+            var productCSAs = ProductCSAOwnerTable.MapProductsToCSAs(products);
+            worksheet.Cell(index, 7).Value = string.Join(',', productCSAs);
+            var approvers = Query.GetApprovers(products);
+            worksheet.Cell(index, 8).Value = string.Join(',', approvers);
             index++;
         }
     }
@@ -95,11 +118,13 @@ static void WriteOverview(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
 static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerable<ModuleMetadata>)> allMetadata)
 {
     worksheet.Cell(1, 1).Value = "Product";
-    worksheet.Cell(1, 2).Value = "Title";
-    worksheet.Cell(1, 3).Value = "Repo";
-    worksheet.Cell(1, 4).Value = "Author";
-    worksheet.Cell(1, 5).Value = "ms.author";
-    worksheet.Cell(1, 6).Value = "Date";
+    worksheet.Cell(1, 2).Value = "CSA";
+    worksheet.Cell(1, 3).Value = "Owner";
+    worksheet.Cell(1, 4).Value = "Title";
+    worksheet.Cell(1, 5).Value = "Repo";
+    worksheet.Cell(1, 6).Value = "Author";
+    worksheet.Cell(1, 7).Value = "ms.author";
+    worksheet.Cell(1, 8).Value = "ms.date";
 
     var firstRow = worksheet.Row(1);
     firstRow.Style.Fill.BackgroundColor = XLColor.Black;
@@ -132,11 +157,14 @@ static void WriteProducts(IXLWorksheet worksheet, IEnumerable<(string, IEnumerab
         {
             worksheet.Row(index).Style.Font.FontSize = 12;
             worksheet.Cell(index, 1).Value = product;
-            worksheet.Cell(index, 2).Value = item.Title;
-            worksheet.Cell(index, 3).Value = item.Repo;
-            worksheet.Cell(index, 4).Value = item.Author;
-            worksheet.Cell(index, 5).Value = item.MsAuthor;
-            worksheet.Cell(index, 6).Value = item.Date;
+            worksheet.Cell(index, 2).Value = ProductCSAOwnerTable.MapProductsToCSAs(new[] {product});
+            var approvers = Query.GetApprovers(new[] {product});
+            worksheet.Cell(index, 3).Value = string.Join(',', approvers);
+            worksheet.Cell(index, 4).Value = item.Title;
+            worksheet.Cell(index, 5).Value = item.Repo;
+            worksheet.Cell(index, 6).Value = item.Author;
+            worksheet.Cell(index, 7).Value = item.MsAuthor;
+            worksheet.Cell(index, 8).Value = item.Date;
             index++;
         }
     }
@@ -152,9 +180,11 @@ static void WriteProductCounts(IXLWorksheet worksheet, IEnumerable<(string, IEnu
     worksheet.Outline.SummaryVLocation = XLOutlineSummaryVLocation.Top;
 
     worksheet.Cell(1, 1).Value = "Product";
-    worksheet.Cell(1, 2).Value = "Repo";
-    worksheet.Cell(1, 3).Value = "Count";
-    worksheet.Cell(1, 4).Value = "Subtotal";
+    worksheet.Cell(1, 2).Value = "CSA";
+    worksheet.Cell(1, 3).Value = "Owner";
+    worksheet.Cell(1, 4).Value = "Repo";
+    worksheet.Cell(1, 5).Value = "Count";
+    worksheet.Cell(1, 6).Value = "Subtotal";
 
     var firstRow = worksheet.Row(1);
     firstRow.Style.Fill.BackgroundColor = XLColor.Black;
@@ -193,15 +223,18 @@ static void WriteProductCounts(IXLWorksheet worksheet, IEnumerable<(string, IEnu
         {
             worksheet.Row(index).Style.Font.FontSize = 12;
             worksheet.Cell(index, 1).Value = product;
-            worksheet.Cell(index, 2).Value = repo.Key;
-            worksheet.Cell(index, 3).Value = repo.Value;
+            worksheet.Cell(index, 2).Value = ProductCSAOwnerTable.MapProductsToCSAs(new[] {product});
+            var approvers = Query.GetApprovers(new[] {product});
+            worksheet.Cell(index, 3).Value = string.Join(',', approvers);
+            worksheet.Cell(index, 4).Value = repo.Key;
+            worksheet.Cell(index, 5).Value = repo.Value;
             subtotal += repo.Value;
             index++;
         }
         worksheet.Rows(startIndex, index - 1).Group();
-        worksheet.Cell(index, 4).Value = subtotal;
-        worksheet.Cell(index, 4).Style.Font.Bold = true;
-        worksheet.Cell(index, 4).Style.Fill.BackgroundColor = XLColor.Aqua;
+        worksheet.Cell(index, 6).Value = subtotal;
+        worksheet.Cell(index, 6).Style.Font.Bold = true;
+        worksheet.Cell(index, 6).Style.Fill.BackgroundColor = XLColor.Aqua;
         index++;
         //worksheet.Cell(2, 6).SetFormulaA1("=SUM(D2:D4)");
     }
@@ -302,6 +335,45 @@ static void WriteFreshness(IXLWorksheet worksheet, IEnumerable<(string, IEnumera
         worksheet.Cell(index, 4).Style.Fill.BackgroundColor = XLColor.Aqua;
         index++;
         //worksheet.Cell(2, 6).SetFormulaA1("=SUM(D2:D4)");
+    }
+
+    foreach (var column in worksheet.ColumnsUsed())
+    {
+        column.AdjustToContents();
+    }
+}
+
+static void WriteRecommendations(IXLWorksheet worksheet, IEnumerable<ProductRecommendation> recommendations)
+{
+    worksheet.Cell(1, 1).Value = "Repo";
+    worksheet.Cell(1, 2).Value = "Title";
+    worksheet.Cell(1, 3).Value = "ms.author";
+    worksheet.Cell(1, 4).Value = "Path";
+    worksheet.Cell(1, 5).Value = "Uid";
+    worksheet.Cell(1, 6).Value = "Recommendation";
+    worksheet.Cell(1, 7).Value = "Label";
+
+    var firstRow = worksheet.Row(1);
+    firstRow.Style.Fill.BackgroundColor = XLColor.Black;
+    firstRow.Style.Font.Bold = true;
+    firstRow.Style.Font.FontSize = 16;
+    firstRow.Style.Font.FontColor = XLColor.Aqua;
+    worksheet.SheetView.FreezeRows(1);
+
+    worksheet.Column(6).Style.Fill.BackgroundColor = XLColor.LightGray;
+
+    int index = 2;
+    foreach (var recommendation in recommendations)
+    {
+        worksheet.Row(index).Style.Font.FontSize = 12;
+        worksheet.Cell(index, 1).Value = recommendation.Repo;
+        worksheet.Cell(index, 2).Value = recommendation.Metadata.Title;
+        worksheet.Cell(index, 3).Value = recommendation.Metadata.MsAuthor;
+        worksheet.Cell(index, 4).Value = PathTable.FilePaths[recommendation.Metadata.Uid];
+        worksheet.Cell(index, 5).Value = recommendation.Metadata.Uid;
+        worksheet.Cell(index, 6).Value = recommendation.Slug;
+        worksheet.Cell(index, 7).Value = recommendation.Label;
+        index++;
     }
 
     foreach (var column in worksheet.ColumnsUsed())

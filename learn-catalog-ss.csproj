@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.95.4" />
     <PackageReference Include="YamlDotNet" Version="11.2.1" />
+    <PackageReference Include="Microsoft.Toolkit.Parsers" Version="7.0.0-preview4" />
   </ItemGroup>
 
 </Project>
